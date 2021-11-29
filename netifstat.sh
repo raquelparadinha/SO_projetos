@@ -1,9 +1,12 @@
 #!/bin/bash
 echo "...Ajuda por favor..."
 
-declare -A argList=()
+declare -A optList
 
-function opcoes() {
+rexp='^[0-9]+([.][0-9]+)?$'
+
+# Lista as opções disponíveis 
+function options() {
     echo "-------------------------------------------------------------------------------------------------"
     echo "OPÇÃO INVÁLIDA!"
     echo "    -c          : Seleção de processos a utilizar através de uma expressão regular"
@@ -21,38 +24,38 @@ function opcoes() {
     echo "-------------------------------------------------------------------------------------------------"
 }
 
-#Tratamentos das opçoes passadas como argumentos
-while getopts "c:bkmp:trTRvl:" option; do
+# Tratamento das opções passadas como argumentos
+while getopts ":c:bkmp:trTRvl:" option; do
 
-    #Adicionar ao array argList as opcoes passadas ao correr o netifstat.sh, caso existam adiciona as que são passadas, caso não, adiciona "nada"
+    # Adicionar ao array optList as opções passadas ao correr o netifstat.sh, caso existam adiciona as que são passadas, caso não, adiciona "none"
     if [[ -z "$OPTARG" ]]; then
-        argList[$option]="nada"
+        optList[$option]="none"
     else
-        argList[$option]=${OPTARG}
+        optList[$option]=${OPTARG}
     fi
 
     case $option in
-    c) #Seleção de processos a utilizar atraves de uma expressão regular
-        str=${argList['c']}
-        if [[ $str == 'nada' || ${str:0:1} == "-" || $str =~ $re ]]; then
+    c) # Seleção das interfaces a visualizar através de uma expressão regular
+        str=${optList['c']}
+        if [[ $str == 'none' || ${str:0:1} == "-" || $str =~ $rexp ]]; then
             echo "Argumento de '-c' não foi preenchido, foi introduzido argumento inválido ou chamou sem '-' atrás da opção passada." >&2
-            opcoes
+            options
             exit 1
         fi
         ;;
-    b) #Ver a opção em bytes
+    b) # Visualizar em bytes
 
         ;;
-    k) #Ver a opção em Kilobytes
+    k) # Visualizar em Kilobytes
 
         ;;
-    m) #Ver a opção em Megabytes
+    m) # Visualizar em Megabytes
 
         ;;
-    p) #Número de interfaces a visualizar
-        if ! [[ ${argList['p']} =~ $re ]]; then
+    p) # Número de interfaces a visualizar
+        if ! [[ ${optList['p']} =~ $rexp ]]; then
             echo "Argumento de '-p' tem de ser um número ou foi usado sem '-' atrás da opção passada." >&2
-            opcoes
+            options
             exit 1
         fi
         ;;
@@ -65,7 +68,7 @@ while getopts "c:bkmp:trTRvl:" option; do
 
         if [[ $i = 1 ]]; then
             #Quando há mais que 1 argumento de ordenacao
-            opcoes
+            options
             exit 1
         else
             #Se algum argumento for de ordenacao i=1
@@ -74,7 +77,7 @@ while getopts "c:bkmp:trTRvl:" option; do
         ;;
 
     *) #Passagem de argumentos inválidos
-        opcoes
+        options
         exit 1
         ;;
     esac

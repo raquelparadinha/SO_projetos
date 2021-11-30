@@ -1,13 +1,16 @@
 #!/bin/bash
+
 echo "...Ajuda por favor..."
 
-declare -A optList
+declare -A optList      # Array associativo (usa strings como index) --> guarda os argumentos passados
 
-rexp='^[0-9]+([.][0-9]+)?$'
+i=0
+rexp='^[0-9]+(\.[0-9]*)?$'
+netif_re='^[a-z]\w{1,14}$'     # Expressão regular que verifica o argumento passado a -c
 
 # Lista as opções disponíveis 
 function options() {
-    echo "-------------------------------------------------------------------------------------------------"
+    echo "-----------------------------------------------------------------------------------"
     echo "OPÇÃO INVÁLIDA!"
     echo "    -c          : Seleção de processos a utilizar através de uma expressão regular"
     echo "    -b          : Ver a opção em bytes"
@@ -20,9 +23,23 @@ function options() {
     echo "    -R          : Dar sort em relação ao RRATE"
     echo "    -v          : Fazer um sort alfabético reverso"
     echo "    -l          : Script deve funcionar em loop de s em s segundos"
-    echo "Último argumento: Tem de ser um número"
-    echo "-------------------------------------------------------------------------------------------------"
+    echo "Último argumento: Número de segundos para a visualização"
+    echo "------------------------------------------------------------------------------------"
 }
+
+# Verifica que o argumento obrigatório está presente
+if [[ $# == 0 ]]; then
+    echo "Deve passar pelo menos um argumento (número de segundos para a visualização)."
+    options
+    exit 1
+fi
+
+# Verifica que o último argumento é o número de segundos
+if !([[ ${@: -1} =~ $rexp ]]); then
+    echo "O último argumento tem de ser o número de segundos que pretende analisar."
+    options
+    exit 1
+fi
 
 # Tratamento das opções passadas como argumentos
 while getopts ":c:bkmp:trTRvl:" option; do
@@ -37,8 +54,8 @@ while getopts ":c:bkmp:trTRvl:" option; do
     case $option in
     c) # Seleção das interfaces a visualizar através de uma expressão regular
         str=${optList['c']}
-        if [[ $str == 'none' || ${str:0:1} == "-" || $str =~ $rexp ]]; then
-            echo "Argumento de '-c' não foi preenchido, foi introduzido argumento inválido ou chamou sem '-' atrás da opção passada." >&2
+        if [[ $str == 'none' || !(${str: 0:1} == "-") || !($str =~ $netif_re) ]]; then
+            echo "Argumento de '-c' não foi preenchido, foi introduzido argumento inválido ou chamou sem '-' atrás da opção passada." #>&2
             options
             exit 1
         fi

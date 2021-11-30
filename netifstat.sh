@@ -3,9 +3,10 @@
 echo "...Ajuda por favor..."
 
 declare -A optList      # Array associativo (usa strings como index) --> guarda os argumentos passados
+declare -A netifList
 
 i=0
-rexp='^[0-9]+(\.[0-9]*)?$'
+rexp='^[0-9]+(\.[0-9]*)?$'     # Verificar se o ultimo arg é um numero
 netif_re='^[a-z]\w{1,14}$'     # Expressão regular que verifica o argumento passado a -c
 
 # Lista as opções disponíveis 
@@ -22,6 +23,7 @@ function options() {
     echo "    -T          : Dar sort em relação ao TRATE"
     echo "    -R          : Dar sort em relação ao RRATE"
     echo "    -v          : Fazer um sort alfabético reverso"
+    echo "Não pode ser passado mais do que um argumento de ordenação em simultâneo (-t, -r, -T, -R, -v)"
     echo "    -l          : Script deve funcionar em loop de s em s segundos"
     echo "Último argumento: Número de segundos para a visualização"
     echo "------------------------------------------------------------------------------------"
@@ -35,7 +37,7 @@ if [[ $# == 0 ]]; then
 fi
 
 # Verifica que o último argumento é o número de segundos
-if !([[ ${@: -1} =~ $rexp ]]); then
+if !([[ ${@: -1} =~ $rexp ]]); then # =~serve para comparar a expressão regex e a outra coisa
     echo "O último argumento tem de ser o número de segundos que pretende analisar."
     options
     exit 1
@@ -54,8 +56,8 @@ while getopts ":c:bkmp:trTRvl:" option; do
     case $option in
     c) # Seleção das interfaces a visualizar através de uma expressão regular
         str=${optList['c']}
-        if [[ $str == 'none' || !(${str: 0:1} == "-") || !($str =~ $netif_re) ]]; then
-            echo "Argumento de '-c' não foi preenchido, foi introduzido argumento inválido ou chamou sem '-' atrás da opção passada." #>&2
+        if [[ $str == 'none' || ${str:0:1} == "-" || $str =~ $netif_re ]]; then
+            echo "Argumento de '-c' não foi preenchido, foi introduzido argumento inválido ou chamou sem '-' atrás da opção passada." >&2
             options
             exit 1
         fi
@@ -101,7 +103,17 @@ while getopts ":c:bkmp:trTRvl:" option; do
 
 done
 
+
 function printData() {
     printf "%-12s %12s %12s %12s %12s\n" "NETIF" "TX" "RX" "TRATE" "RRATE"
+
+    n=0
+    for netif in /sys/class/net/[[:digit:]]*; do
+        if [[ $netif =~ $netif_re ]]; then
+            netifList[n]=$netif
+        fi
+        n=$((n + 1))
+    done
+    printf $netifList
 }
 printData

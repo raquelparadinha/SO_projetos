@@ -5,7 +5,7 @@ declare -A netifList=()
 netif_re='^[a-z]\w{1,14}$'
 n=0
 #echo `cat /sys/class/net`
-for netif in /sys/class/net/*; do
+for netif in /sys/class/net/[[:alnum:]]*; do
     echo "$netif"
     if [[ $netif =~ $netif_re ]]; then
         netifList[$n]=$netif

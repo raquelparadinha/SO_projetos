@@ -17,14 +17,13 @@ function options() {
     echo "    -b          : Ver a opção em bytes"
     echo "    -k          : Ver a opção em Kilobytess"
     echo "    -m          : Ver a opção em Megabytes"
-    echo "Apenas pode ser usada uma das opções -b, -k, -m"
     echo "    -p          : Usado para defenir o número de interfaces a  visualisar" 
     echo "    -t          : Dar sort em relação ao TX"
     echo "    -r          : Dar sort em relação ao RX"
     echo "    -T          : Dar sort em relação ao TRATE"
     echo "    -R          : Dar sort em relação ao RRATE"
-    echo "Não pode ser passado mais do que um argumento de ordenação em simultâneo (-t, -r, -T, -R)"
-    echo "    -v          : Fazer um sort reverso"
+    echo "    -v          : Fazer um sort alfabético reverso"
+    echo "Não pode ser passado mais do que um argumento de ordenação em simultâneo (-t, -r, -T, -R, -v)"
     echo "    -l          : Script deve funcionar em loop de s em s segundos"
     echo "Último argumento: Número de segundos para a visualização"
     echo "------------------------------------------------------------------------------------"
@@ -104,17 +103,52 @@ while getopts ":c:bkmp:trTRvl:" option; do
 
 done
 
+#cd /sys/class/net/
+
+#netif=$(ls /sys/class/net)
+declare -a name
+declare -a rx
+declare -a tx
+declare -a trate
+declare -a rrate
+
+i=0
+for net in /sys/class/net/[[:alnum:]]*; do
+    if [[ -r $net/statistics ]]; then
+    FILE="$net"
+    #basename "$FILE"
+    f="$(basename -- $FILE)"
+    #echo "$f"
+    if_name[$i]=$f
+    echo ${if_name[$i]}
+
+    rx_bytes=$(cat $net/statistics/rx_bytes | grep -o -E '[0-9]+') #está em bytes
+    #echo $rx_bytes
+    rx[$i]=$rx_bytes
+
+    tx_bytes=$(cat $net/statistics/tx_bytes | grep -o -E '[0-9]+') #está em bytes
+    #echo $tx_bytes
+    tx[$i]=$tx_bytes
+
+    rrate=
+
+    i=$((i + 1))
+    echo $i
+    fi
+done
 
 function printData() {
     printf "%-12s %12s %12s %12s %12s\n" "NETIF" "TX" "RX" "TRATE" "RRATE"
 
-    for net in /sys/class/net/[[:alnum:]]*; do
-        if [[ -r $net/statistics ]]; then
-            rx_bytes=$(cat $net/statistics/rx_bytes | grep -o -E '[0-9]+') #está em bytes
-            #echo $rx_bytes
-            tx_bytes=$(cat $net/statistics/tx_bytes | grep -o -E '[0-9]+') #está em bytes
-            #echo $tx_bytes
+    n=0
+    for netif in /sys/class/net/[[:alnum:]]*; do
+        echo "$netif"
+        if [[ $netif =~ $netif_re ]]; then
+            netifList[$n]=$netif
         fi
+        echo $n
+        echo "${netifList[*]}"
+        n=$((n + 1))
     done
 }
-printData
+#printData

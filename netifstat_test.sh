@@ -37,7 +37,8 @@ if [[ $# == 0 ]]; then
 fi
 
 # Verifica que o último argumento é o número de segundos
-if !([[ ${@: -1} =~ $rexp ]]); then # =~serve para comparar a expressão regex e a outra coisa
+sec=${@: -1}
+if !([[ $sec =~ $rexp ]]); then # =~serve para comparar a expressão regex e a outra coisa
     echo "O último argumento tem de ser o número de segundos que pretende analisar."
     options
     exit 1
@@ -103,9 +104,6 @@ while getopts ":c:bkmp:trTRvl:" option; do
 
 done
 
-#cd /sys/class/net/
-
-#netif=$(ls /sys/class/net)
 declare -a name
 declare -a rx
 declare -a tx
@@ -116,24 +114,27 @@ i=0
 for net in /sys/class/net/[[:alnum:]]*; do
     if [[ -r $net/statistics ]]; then
     FILE="$net"
-    #basename "$FILE"
     f="$(basename -- $FILE)"
-    #echo "$f"
     if_name[$i]=$f
     echo ${if_name[$i]}
 
     rx_bytes=$(cat $net/statistics/rx_bytes | grep -o -E '[0-9]+') #está em bytes
-    #echo $rx_bytes
+    echo $rx_bytes
     rx[$i]=$rx_bytes
 
     tx_bytes=$(cat $net/statistics/tx_bytes | grep -o -E '[0-9]+') #está em bytes
     #echo $tx_bytes
     tx[$i]=$tx_bytes
+    echo $sec
+    rrate=$(bc <<< "scale=1;$rx_bytes/$sec")
+    rrate[$i]=rrate
+    echo $rrate
 
-    rrate=
+    trate=$(bc <<< "scale=1;$tx_bytes/$sec")
+    trate[$i]=trate
+    echo $trate
 
     i=$((i + 1))
-    echo $i
     fi
 done
 

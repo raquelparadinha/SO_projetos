@@ -3,11 +3,15 @@
 echo "...Ajuda por favor..."
 
 declare -A optList      # Array associativo (usa strings como index) --> guarda os argumentos passados
-declare -A netifList
+declare -a name         # Array que guarda os nomes das interfaces de rede
+declare -A rx           # Array associativo que guarda os rx
+declare -A tx           # Array associativo que guarda os tx        # O index corresponde ao nome da interface
+declare -A trate        # Array associativo que guarda os trate     
+declare -A rrate        # Array associativo que guarda os rrate
 
 i=0
 rexp='^[0-9]+(\.[0-9]*)?$'     # Verificar se o ultimo arg é um numero
-netif_re='^[a-z]\w{1,14}$'     # Expressão regular que verifica o argumento passado a -c
+netif_re='^[a-z]\w{1-14}$'     # Expressão regular que verifica o argumento passado a -c 
 
 # Lista as opções disponíveis 
 function options() {
@@ -32,20 +36,21 @@ function options() {
 
 # Verifica que o argumento obrigatório está presente
 if [[ $# == 0 ]]; then
-    echo "Deve passar pelo menos um argumento (número de segundos para a visualização)."
+    echo "ERRO! Deve passar pelo menos um argumento (número de segundos para a visualização)."
     options
     exit 1
 fi
 
 # Verifica que o último argumento é o número de segundos
-if !([[ ${@: -1} =~ $rexp ]]); then # =~serve para comparar a expressão regex e a outra coisa
-    echo "O último argumento tem de ser o número de segundos que pretende analisar."
+sec=${@: -1}
+if !([[ $sec =~ $rexp ]]); then # =~serve para comparar a expressão regex e a outra coisa
+    echo "ERRO! O último argumento tem de ser o número de segundos que pretende analisar."
     options
     exit 1
 fi
 
 # Tratamento das opções passadas como argumentos
-while getopts ":c:bkmp:trTRvl:" option; do
+while getopts "c:bkmp:trTRvl:" option; do
 
     # Adicionar ao array optList as opções passadas ao correr o netifstat.sh, caso existam adiciona as que são passadas, caso não, adiciona "none"
     if [[ -z "$OPTARG" ]]; then
@@ -108,12 +113,28 @@ done
 function printData() {
     printf "%-12s %12s %12s %12s %12s\n" "NETIF" "TX" "RX" "TRATE" "RRATE"
 
+    n=0
     for net in /sys/class/net/[[:alnum:]]*; do
         if [[ -r $net/statistics ]]; then
+            FILE="$net"
+            f="$(basename -- $FILE)"
+            name[$n]=$f
+
             rx_bytes=$(cat $net/statistics/rx_bytes | grep -o -E '[0-9]+') #está em bytes
-            #echo $rx_bytes
+            rx[$f]=$rx_bytes
+
             tx_bytes=$(cat $net/statistics/tx_bytes | grep -o -E '[0-9]+') #está em bytes
-            #echo $tx_bytes
+            tx[$f]=$tx_bytes
+
+            rrate=$(bc <<< "scale=1;$rx_bytes/$sec")
+            rrate[$f]=$rrate
+
+            trate=$(bc <<< "scale=1;$tx_bytes/$sec")
+            trate[$f]=$trate
+
+            printf "%-12s %12s %12s %12s %12s\n" "$f" "${tx[$f]}" "${rx[$f]}" "${trate[$f]}" "${rrate[$f]}"
+
+            n=$((n + 1))
         fi
     done
 }

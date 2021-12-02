@@ -3,27 +3,32 @@
 echo "...Ajuda por favor..."
 
 declare -A optList      # Array associativo (usa strings como index) --> guarda os argumentos passados
-declare -A netifList
+declare -a name         # Array que guarda os nomes das interfaces de rede
+declare -A rx           # Array associativo que guarda os rx
+declare -A tx           # Array associativo que guarda os tx        # O index corresponde ao nome da interface
+declare -A trate        # Array associativo que guarda os trate     
+declare -A rrate        # Array associativo que guarda os rrate
 
 i=0
 rexp='^[0-9]+(\.[0-9]*)?$'     # Verificar se o ultimo arg é um numero
-netif_re='^[a-z]\w{1,14}$'     # Expressão regular que verifica o argumento passado a -c
+netif_re='^[a-z]\w{1-14}$'     # Expressão regular que verifica o argumento passado a -c 
 
 # Lista as opções disponíveis 
 function options() {
     echo "-----------------------------------------------------------------------------------"
     echo "OPÇÃO INVÁLIDA!"
     echo "    -c          : Seleção de processos a utilizar através de uma expressão regular"
-    echo "    -b          : Ver a opção em bytes"
-    echo "    -k          : Ver a opção em Kilobytess"
+    echo "    -b          : Ver a opção em bytes, se não for escrita nenhuma das opções (-b;-k;-m) será esta a utilizada"
+    echo "    -k          : Ver a opção em Kilobytes"
     echo "    -m          : Ver a opção em Megabytes"
+    echo "Apenas pode ser usada uma das opções -b, -k, -m"
     echo "    -p          : Usado para defenir o número de interfaces a  visualisar" 
     echo "    -t          : Dar sort em relação ao TX"
     echo "    -r          : Dar sort em relação ao RX"
     echo "    -T          : Dar sort em relação ao TRATE"
     echo "    -R          : Dar sort em relação ao RRATE"
-    echo "    -v          : Fazer um sort alfabético reverso"
-    echo "Não pode ser passado mais do que um argumento de ordenação em simultâneo (-t, -r, -T, -R, -v)"
+    echo "Não pode ser passado mais do que um argumento de ordenação em simultâneo (-t, -r, -T, -R)"
+    echo "    -v          : Fazer um sort reverso"
     echo "    -l          : Script deve funcionar em loop de s em s segundos"
     echo "Último argumento: Número de segundos para a visualização"
     echo "------------------------------------------------------------------------------------"
@@ -31,7 +36,7 @@ function options() {
 
 # Verifica que o argumento obrigatório está presente
 if [[ $# == 0 ]]; then
-    echo "Deve passar pelo menos um argumento (número de segundos para a visualização)."
+    echo "ERRO! Deve passar pelo menos um argumento (número de segundos para a visualização)."
     options
     exit 1
 fi
@@ -39,13 +44,13 @@ fi
 # Verifica que o último argumento é o número de segundos
 sec=${@: -1}
 if !([[ $sec =~ $rexp ]]); then # =~serve para comparar a expressão regex e a outra coisa
-    echo "O último argumento tem de ser o número de segundos que pretende analisar."
+    echo "ERRO! O último argumento tem de ser o número de segundos que pretende analisar."
     options
     exit 1
 fi
 
 # Tratamento das opções passadas como argumentos
-while getopts ":c:bkmp:trTRvl:" option; do
+while getopts "c:bkmp:trTRvl:" option; do
 
     # Adicionar ao array optList as opções passadas ao correr o netifstat.sh, caso existam adiciona as que são passadas, caso não, adiciona "none"
     if [[ -z "$OPTARG" ]]; then
@@ -104,52 +109,46 @@ while getopts ":c:bkmp:trTRvl:" option; do
 
 done
 
-declare -a name
-declare -a rx
-declare -a tx
-declare -a trate
-declare -a rrate
 
-i=0
-for net in /sys/class/net/[[:alnum:]]*; do
-    if [[ -r $net/statistics ]]; then
-    FILE="$net"
-    f="$(basename -- $FILE)"
-    if_name[$i]=$f
-    echo ${if_name[$i]}
-
-    rx_bytes=$(cat $net/statistics/rx_bytes | grep -o -E '[0-9]+') #está em bytes
-    echo $rx_bytes
-    rx[$i]=$rx_bytes
-
-    tx_bytes=$(cat $net/statistics/tx_bytes | grep -o -E '[0-9]+') #está em bytes
-    #echo $tx_bytes
-    tx[$i]=$tx_bytes
-    echo $sec
-    rrate=$(bc <<< "scale=1;$rx_bytes/$sec")
-    rrate[$i]=rrate
-    echo $rrate
-
-    trate=$(bc <<< "scale=1;$tx_bytes/$sec")
-    trate[$i]=trate
-    echo $trate
-
-    i=$((i + 1))
-    fi
-done
 
 function printData() {
     printf "%-12s %12s %12s %12s %12s\n" "NETIF" "TX" "RX" "TRATE" "RRATE"
 
     n=0
-    for netif in /sys/class/net/[[:alnum:]]*; do
-        echo "$netif"
-        if [[ $netif =~ $netif_re ]]; then
-            netifList[$n]=$netif
+    for net in /sys/class/net/[[:alnum:]]*; do
+        if [[ -r $net/statistics ]]; then
+            FILE="$net"
+            f="$(basename -- $FILE)"
+            #echo "${optList[*]}"
+            if [[ -v optList[c] && ! $f =~ ${optList['c']} ]]; then
+                continue
+            fi
+            name[$n]=$f
+            #echo "$sec"
+
+            rx_bytes1=$(cat $net/statistics/rx_bytes | grep -o -E '[0-9]+') #está em bytes
+            tx_bytes1=$(cat $net/statistics/tx_bytes | grep -o -E '[0-9]+') #está em bytes
+
+            sleep $sec
+
+            rx_bytes2=$(cat $net/statistics/rx_bytes | grep -o -E '[0-9]+') #está em bytes
+            tx_bytes2=$(cat $net/statistics/tx_bytes | grep -o -E '[0-9]+') #está em bytes
+            #echo "$rx_bytes1"
+            #echo "$rx_bytes2"
+            rx[$f]=$((rx_bytes2 - rx_bytes1))
+            tx[$f]=$((tx_bytes2 - tx_bytes1))
+
+            echo "${rx[$f]}"
+            rrate=$(bc <<< "scale=1;rx[$f]/$sec")
+            rrate[$f]=$rrate
+
+            trate=$(bc <<< "scale=1;tx[$f]/$sec")
+            trate[$f]=$trate
+
+            printf "%-12s %12s %12s %12s %12s\n" "$f" "${tx[$f]}" "${rx[$f]}" "${trate[$f]}" "${rrate[$f]}"
+
+            n=$((n + 1))
         fi
-        echo $n
-        echo "${netifList[*]}"
-        n=$((n + 1))
     done
 }
-#printData
+printData

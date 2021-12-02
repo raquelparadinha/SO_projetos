@@ -1,11 +1,12 @@
 #!/bin/bash
 
+# Acesso Pc: sop0506; mcsez
 echo "...Ajuda por favor..."
 
 declare -A optList      # Array associativo (usa strings como index) --> guarda os argumentos passados
 declare -a name         # Array que guarda os nomes das interfaces de rede
 declare -A rx           # Array associativo que guarda os rx
-declare -A tx           # Array associativo que guarda os tx        # O index corresponde ao nome da interface
+declare -A tx           # Array associativo que guarda os tx        # O index corresponde a06; mcsezsop05o nome da interface
 declare -A trate        # Array associativo que guarda os trate     
 declare -A rrate        # Array associativo que guarda os rrate
 
@@ -19,7 +20,7 @@ function options() {
     echo "OPÇÃO INVÁLIDA!"
     echo "    -c          : Seleção de processos a utilizar através de uma expressão regular"
     echo "    -b          : Ver a opção em bytes"
-    echo "    -k          : Ver a opção em Kilobytess"
+    echo "    -k          : Ver a opção em Kilobytes"
     echo "    -m          : Ver a opção em Megabytes"
     echo "Apenas pode ser usada uma das opções -b, -k, -m"
     echo "    -p          : Usado para defenir o número de interfaces a  visualisar" 

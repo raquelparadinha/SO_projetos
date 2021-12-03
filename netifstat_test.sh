@@ -9,9 +9,9 @@ declare -A tx           # Array associativo que guarda os tx        # O index co
 declare -A trate        # Array associativo que guarda os trate     
 declare -A rrate        # Array associativo que guarda os rrate
 
-i=0
 rexp='^[0-9]+(\.[0-9]*)?$'     # Verificar se o ultimo arg é um numero
-netif_re='^[a-z]\w{1-14}$'     # Expressão regular que verifica o argumento passado a -c 
+netif_re='^[a-z]\w{1-14}$'     # Expressão regular que verifica o argumento passado a -c
+nr_args=1
 
 # Lista as opções disponíveis 
 function options() {
@@ -43,12 +43,14 @@ fi
 
 # Verifica que o último argumento é o número de segundos
 sec=${@: -1}
-if !([[ $sec =~ $rexp ]]); then # =~serve para comparar a expressão regex e a outra coisa
+if !([[ $sec =~ $rexp ]]); then # =~ serve para comparar a expressão regex e a outra coisa
     echo "ERRO! O último argumento tem de ser o número de segundos que pretende analisar."
-    options
+    options                                                                                                                         
     exit 1
 fi
 
+ord=0
+un=3
 # Tratamento das opções passadas como argumentos
 while getopts "c:bkmp:trTRvl:" option; do
 
@@ -61,21 +63,28 @@ while getopts "c:bkmp:trTRvl:" option; do
 
     case $option in
     c) # Seleção das interfaces a visualizar através de uma expressão regular
-        str=${optList['c']}
-        if [[ $str == 'none' || ${str:0:1} == "-" || $str =~ $netif_re ]]; then
+        arg=${optList['c']}
+        if [[ $arg == 'none' || ${arg:0:1} == "-" || $arg =~ $netif_re ]]; then
             echo "Argumento de '-c' não foi preenchido, foi introduzido argumento inválido ou chamou sem '-' atrás da opção passada." >&2
             options
             exit 1
         fi
+        let "nr_args +=2"
         ;;
-    b) # Visualizar em bytes
-
-        ;;
-    k) # Visualizar em Kilobytes
-
-        ;;
-    m) # Visualizar em Megabytes
-
+    b | k | m) # Unidades
+        if [[ $un = 0 || $un = 1 || $un = 2 ]]; then 
+            # Quando há mais que 1 argumento de unidades
+            echo "ERRO! Não é possivel usar -b, -k ou -m ao mesmo tempo!"
+            options
+            exit 1
+        elif [[ optList[k] ]]; then
+            $un = 1     # Unidade = Kilobytes
+        elif [[ optList[m] ]]; then 
+            $un = 2     # Unidade = Megabyte
+        else 
+            $un = 0     # Unidade = Byte
+        fi
+        let "nr_args +=1"
         ;;
     p) # Número de interfaces a visualizar
         if ! [[ ${optList['p']} =~ $rexp ]]; then
@@ -83,24 +92,31 @@ while getopts "c:bkmp:trTRvl:" option; do
             options
             exit 1
         fi
+        let "nr_args +=2"
         ;;
 
     r) #Ordenação reversa
 
+        let "nr_args +=2"
         ;;
 
     t | T | R | v)
 
-        if [[ $i = 1 ]]; then
+        if [[ $ord = 1 ]]; then
             #Quando há mais que 1 argumento de ordenacao
+            echo "Não é possivel usar -t,-T,-R ou -V ao mesmo tempo!"
             options
             exit 1
         else
-            #Se algum argumento for de ordenacao i=1
-            i=1
+            #Se algum argumento for de ordenacao ord=1
+            ord=1
         fi
+        let "nr_args +=1"
         ;;
+    l) # Loop
 
+        let "nr_args +=2"
+        ;;
     *) #Passagem de argumentos inválidos
         options
         exit 1
@@ -108,13 +124,25 @@ while getopts "c:bkmp:trTRvl:" option; do
     esac
 
 done
-
+if ! [[ $nr_args == $# ]]; then
+    echo "Reveja os argumentos colocados, não introduziu o número correto destes ou no lugar errado"
+    options
+    exit 1
+fi
 
 
 function printData() {
     printf "%-12s %12s %12s %12s %12s\n" "NETIF" "TX" "RX" "TRATE" "RRATE"
 
     n=0
+
+    if ! [[ -v argOpt[p] ]]; then
+        p=${#nameS[@]}
+    #Nº de processos que queremos ver
+    else
+        p=${argOpt['p']}
+    fi
+
     for net in /sys/class/net/[[:alnum:]]*; do
         if [[ -r $net/statistics ]]; then
             FILE="$net"
@@ -126,8 +154,8 @@ function printData() {
             name[$n]=$f
             #echo "$sec"
 
-            rx_bytes1=$(cat $net/statistics/rx_bytes | grep -o -E '[0-9]+') #está em bytes
-            tx_bytes1=$(cat $net/statistics/tx_bytes | grep -o -E '[0-9]+') #está em bytes
+            rx_bytes1=$(cat $net/statistics/rx_bytes | grep -o -E '[0-9]+') # está em bytes
+            tx_bytes1=$(cat $net/statistics/tx_bytes | grep -o -E '[0-9]+') # está em bytes
 
             sleep $sec
 
@@ -138,11 +166,11 @@ function printData() {
             rx[$f]=$((rx_bytes2 - rx_bytes1))
             tx[$f]=$((tx_bytes2 - tx_bytes1))
 
-            echo "${rx[$f]}"
-            rrate=$(bc <<< "scale=1;rx[$f]/$sec")
+            echo "${rx[$f]}/$sec"
+            rrate=$(bc <<< "scale=1;${rx[$f]}/$sec")
             rrate[$f]=$rrate
 
-            trate=$(bc <<< "scale=1;tx[$f]/$sec")
+            trate=$(bc <<< "scale=1;${tx[$f]}/$sec")
             trate[$f]=$trate
 
             printf "%-12s %12s %12s %12s %12s\n" "$f" "${tx[$f]}" "${rx[$f]}" "${trate[$f]}" "${rrate[$f]}"
@@ -150,5 +178,18 @@ function printData() {
             n=$((n + 1))
         fi
     done
+    if [[ -v argOpt[t] ]]; then
+        #Ordenação da tabela pelo TX
+        printf '%s \n' "${arrayAss[@]}" | sort $ordem -k2 | head -n $p
+    elif [[ -v argOpt[r] ]]; then
+        #Ordenação da tabela pelo RX
+        printf '%s \n' "${arrayAss[@]}" | sort $ordem -k3 | head -n $p
+    elif [[ -v argOpt[T] ]]; then
+        #Ordenação da tabela pelo TRATE
+        printf '%s \n' "${arrayAss[@]}" | sort $ordem -k4 | head -n $p
+    elif [[ -v argOpt[R] ]]; then
+        #Ordenação da tabela pelo RRATE
+        printf '%s \n' "${arrayAss[@]}" | sort $ordem -k5 | head -n $p
+    fi
 }
 printData

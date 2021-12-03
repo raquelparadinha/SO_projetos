@@ -119,6 +119,9 @@ function printData() {
         if [[ -r $net/statistics ]]; then
             FILE="$net"
             f="$(basename -- $FILE)"
+            if [[ -v optList[c] && ! $f =~ ${optList['c']} ]]; then
+                continue
+            fi
             name[$n]=$f
 
             rx_bytes=$(cat $net/statistics/rx_bytes | grep -o -E '[0-9]+') #está em bytes

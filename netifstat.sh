@@ -90,7 +90,7 @@ if [[ $# == 0 ]]; then
 fi
 
 # Verifica que o último argumento é o número de segundos
-if ! [[ $SEC =~ $rexp ]]; then # =~ serve para comparar a expressão regex e a outra coisa
+if ! [[ $SEC =~ $rexp ]]; then 
     echo "ERRO: o último argumento tem de ser o número de segundos que pretende analisar." >&2
     error_exit
 fi
@@ -163,8 +163,7 @@ printData() {
     un=$((1024 ** exp))
     for net in /sys/class/net/[[:alnum:]]*; do
         if [[ -r $net/statistics ]]; then
-            FILE="$net"
-            f="$(basename -- $FILE)"
+            f="$(basename -- $net)"
             if ! [[ $NAME =~ ""  && $f =~ $NAME ]]; then   
                 continue                                  
             fi               
@@ -195,7 +194,7 @@ printData() {
             fi
             n=$((n + 1))
         fi
-        if [ $n == $NUMBER ]; then  
+        if [[ $n == $NUMBER ]]; then  
             break
         fi
     done
@@ -214,11 +213,12 @@ printData() {
             fi
             n=$((n + 1))
         fi
-        if [ $n == $NUMBER ]; then
+        if [[ $n == $NUMBER ]]; then
             break
         fi
     done | sort -k$col$reverse
 }
+
 if [[ $loop == 1 ]]; then
     while true; do
         printf "%-12s %12s %12s %12s %12s %12s %12s\n" "NETIF" "TX" "RX" "TRATE" "RRATE" "TXTOT" "RXTOT"
@@ -231,5 +231,5 @@ else
     printf "%-12s %12s %12s %12s %12s\n" "NETIF" "TX" "RX" "TRATE" "RRATE"
     printData
 fi
-exit 0
 
+exit 0

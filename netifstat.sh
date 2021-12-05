@@ -9,30 +9,32 @@
 #
 ###############################################################################################################################
 
-declare -A rx           # Array associativo que guarda os rx
-declare -A tx           # Array associativo que guarda os tx        # O index corresponde ao nome da interface
-declare -A trate        # Array associativo que guarda os trate     
-declare -A rrate        # Array associativo que guarda os rrate
-declare -A rx_last
-declare -A tx_last
-declare -A rx_total
-declare -A tx_total
+declare -A rx           # Array associativo que guarda os valores de rx
+declare -A tx           # Array associativo que guarda os valores de tx        # O index corresponde ao nome da interface
+declare -A rrate        # Array associativo que guarda os valores de rrate
+declare -A trate        # Array associativo que guarda os valores de trate     
+declare -A rx_last      # Array associativo que guarda os valores de rx do loop anterior
+declare -A tx_last      # Array associativo que guarda os valores de tx do loop anterior
+declare -A rx_total     # Array associativo que guarda a soma dos valores de rx a cada loop
+declare -A tx_total     # Array associativo que guarda a soma dos valores de tx a cada loop
 
-rexp='^[0-9]+(\.[0-9]*)?$'     # Verificar se o ultimo arg é um numero
-name=""
-number=0
-turn=0                      # começa em 1 porque já conta com o argumento dos segundos, serve para ver se os argumentos estão bem colocados
-ctrl=0
-ord=0
-exp=0
-loop=0
-col=1
-reverse=""
+rexp='^[0-9]+(\.[0-9]*)?$'      # Expressão regex para verificar se o último arg é um número
+SEC=${@: -1}                    # Último argumento é o número de segundos
+NAME=""                         # Expressão regex para selecionar as interfaces
+NUMBER=""                       # Número de interfaces que queremos ver
+ctrl=0                          # Valor de controlo para as opções de unidades
+ord=0                           # Valor de controlo para as opções de ordenação
+exp=0                           # Valor do expoente para fazer a conversão de unidades
+loop=0                          # Ativa ou desativa o loop
+col=1                           # Identifica a coluna por onde vão ser ordenados os dados
+reverse=""                      # Ativa ou desativa o sort reverso
+turn=0                          # Indica se é a primeira vez que o loop é executado
+
 
 # Lista as opções disponíveis 
 options() {
     echo "-----------------------------------------------------------------------------------"
-    echo "${@:0} -c [name] -b|-k|-m -p [number] -t|-r|-T|-R -v -l [seconds]"
+    echo "${@:0} -c [NAME] -b|-k|-m -p [NUMBER] -t|-r|-T|-R -v -l [SEC]"
     echo
     echo "OPÇÕES DISPONÍVEIS!"
     echo
@@ -64,7 +66,7 @@ error_exit () {
 unit_exit () {
     if [[ $ctrl == 1 ]]; then 
         # Quando há mais que 1 argumento de unidades
-        echo "ERRO: não é possivel usar -b, -k e -m ao mesmo tempo!"
+        echo "ERRO: não é possivel usar -b, -k e -m ao mesmo tempo!" >&2
         error_exit
     else 
         ctrl=1
@@ -74,7 +76,7 @@ unit_exit () {
 sort_exit () {
     reverse="r"
     if [[ $ord == 1 ]]; then
-        echo "Não é possivel usar -t,-r,-T e -R ao mesmo tempo!"
+        echo "Não é possivel usar -t,-r,-T e -R ao mesmo tempo!" >&2
         error_exit
     else 
         ord=1
@@ -83,14 +85,13 @@ sort_exit () {
 
 # Verifica que o argumento obrigatório está presente
 if [[ $# == 0 ]]; then
-    echo "ERRO: deve passar pelo menos um argumento (número de segundos a analisar)."
+    echo "ERRO: deve passar pelo menos um argumento (número de segundos a analisar)." >&2
     error_exit
 fi
 
 # Verifica que o último argumento é o número de segundos
-sec=${@: -1}
-if ! [[ $sec =~ $rexp ]]; then # =~ serve para comparar a expressão regex e a outra coisa
-    echo "ERRO: o último argumento tem de ser o número de segundos que pretende analisar."
+if ! [[ $SEC =~ $rexp ]]; then # =~ serve para comparar a expressão regex e a outra coisa
+    echo "ERRO: o último argumento tem de ser o número de segundos que pretende analisar." >&2
     error_exit
 fi
 
@@ -100,7 +101,7 @@ set -- "${@:1:$(($#-1))}"   #retira o último arg (sec) para não ser usado como
 while getopts ":c:bkmp:trTRvl" option; do    
     case $option in
     c) # Seleção das interfaces a visualizar através de uma expressão regular
-        name=$OPTARG
+        NAME=$OPTARG
         ;;
     b)
         unit_exit     # Unidade = Byte
@@ -114,9 +115,9 @@ while getopts ":c:bkmp:trTRvl" option; do
         exp=2     # Unidade = MegaByte
         ;;
     p) # Número de interfaces a visualizar
-        number=$OPTARG
-        if [[ number =~ "^[0-9]+$" ]]; then
-            echo "ERRO: o número de interfaces tem de ser um inteiro positivo."
+        NUMBER=$OPTARG
+        if [[ NUMBER =~ "^[0-9]+$" ]]; then
+            echo "ERRO: o número de interfaces tem de ser um inteiro positivo." >&2
             error_exit
         fi
         ;;
@@ -147,11 +148,11 @@ while getopts ":c:bkmp:trTRvl" option; do
         loop=1
         ;;
     :) # Argumento obrigatório em falta
-        echo "ERRO: argumento em falta na opção -${OPTARG}!" 1>&2
+        echo "ERRO: argumento em falta na opção -${OPTARG}!" >&2
         error_exit
         ;;
     *) #Passagem de argumentos inválidos
-        echo "ERRO: opção inválida!"
+        echo "ERRO: opção inválida!" >&2
         error_exit
         ;;
     esac
@@ -164,14 +165,14 @@ printData() {
         if [[ -r $net/statistics ]]; then
             FILE="$net"
             f="$(basename -- $FILE)"
-            if ! [[ $name =~ ""  && $f =~ $name ]]; then   
+            if ! [[ $NAME =~ ""  && $f =~ $NAME ]]; then   
                 continue                                  
             fi               
 
             if [[ $turn == 0 ]]; then
                 rx_bytes1=$(cat $net/statistics/rx_bytes | grep -o -E '[0-9]+') # está em bytes
                 tx_bytes1=$(cat $net/statistics/tx_bytes | grep -o -E '[0-9]+') # está em bytes
-                sleep $sec
+                sleep $SEC
             else
                 rx_bytes1=rx_last[$f]
                 tx_bytes1=tx_last[$f]
@@ -183,8 +184,8 @@ printData() {
             rx[$f]=$((rx_bytes2 - rx_bytes1))
             tx[$f]=$((tx_bytes2 - tx_bytes1))
 
-            rrate[$f]=$(bc <<< "scale=1;${rx[$f]}/$sec")
-            trate[$f]=$(bc <<< "scale=1;${tx[$f]}/$sec")
+            rrate[$f]=$(bc <<< "scale=1;${rx[$f]}/$SEC")
+            trate[$f]=$(bc <<< "scale=1;${tx[$f]}/$SEC")
 
             if [[ $loop == 1 ]]; then
                 tx_total[$f]=$((tx_total[$f] + tx[$f]))
@@ -194,7 +195,7 @@ printData() {
             fi
             n=$((n + 1))
         fi
-        if [ $n == $number ]; then  
+        if [ $n == $NUMBER ]; then  
             break
         fi
     done
@@ -203,7 +204,7 @@ printData() {
         if [[ -r $net/statistics ]]; then
             FILE="$net"
             f="$(basename -- $FILE)"
-            if ! [[ $name =~ ""  && $f =~ $name ]]; then   
+            if ! [[ $NAME =~ ""  && $f =~ $NAME ]]; then   
                 continue                                  
             fi              
             if [[ $loop == 1 ]]; then
@@ -213,7 +214,7 @@ printData() {
             fi
             n=$((n + 1))
         fi
-        if [ $n == $number ]; then
+        if [ $n == $NUMBER ]; then
             break
         fi
     done | sort -k$col$reverse
@@ -224,7 +225,7 @@ if [[ $loop == 1 ]]; then
         printData
         turn=1
         echo ""
-        sleep $sec
+        sleep $SEC
     done
 else
     printf "%-12s %12s %12s %12s %12s\n" "NETIF" "TX" "RX" "TRATE" "RRATE"

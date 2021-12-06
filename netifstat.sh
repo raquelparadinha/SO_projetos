@@ -58,7 +58,7 @@ options() {
     echo "------------------------------------------------------------------------------------"
 }
 
-error_exit () {
+error_exit () {+
     options
     exit 1
 }
@@ -183,8 +183,8 @@ printData() {
             rx[$f]=$((rx_bytes2 - rx_bytes1))
             tx[$f]=$((tx_bytes2 - tx_bytes1))
 
-            rrate[$f]=$(bc <<< "scale=1;${rx[$f]}/$SEC")
-            trate[$f]=$(bc <<< "scale=1;${tx[$f]}/$SEC")
+            rrate[$f]=$(bc <<< "scale=3;${rx[$f]}/$SEC")
+            trate[$f]=$(bc <<< "scale=3;${tx[$f]}/$SEC")
 
             if [[ $loop == 1 ]]; then
                 tx_total[$f]=$((tx_total[$f] + tx[$f]))
@@ -201,15 +201,14 @@ printData() {
     n=0
     for net in /sys/class/net/[[:alnum:]]*; do
         if [[ -r $net/statistics ]]; then
-            FILE="$net"
-            f="$(basename -- $FILE)"
+            f="$(basename -- $net)"
             if ! [[ $NAME =~ ""  && $f =~ $NAME ]]; then   
                 continue                                  
             fi              
             if [[ $loop == 1 ]]; then
-                printf "%-12s %12s %12s %12s %12s %12s %12s\n" "$f" "$(bc <<< "scale=1; ${tx[$f]}/$un")" "$(bc <<< "scale=1; ${rx[$f]}/$un")" "$(bc <<< "scale=1;${trate[$f]}/$un")" "$(bc <<< "scale=1;${rrate[$f]}/$un")" "$(bc <<< "scale=1;${tx_total[$f]}/$un")" "$(bc <<< "scale=1;${rx_total[$f]}/$un")"
+                printf "%-12s %12s %12s %12s %12s %12s %12s\n" "$f" "$(bc <<< "scale=3; ${tx[$f]}/$un")" "$(bc <<< "scale=3; ${rx[$f]}/$un")" "$(bc <<< "scale=3;${trate[$f]}/$un")" "$(bc <<< "scale=3;${rrate[$f]}/$un")" "$(bc <<< "scale=3;${tx_total[$f]}/$un")" "$(bc <<< "scale=3;${rx_total[$f]}/$un")"
             else
-                printf "%-12s %12s %12s %12s %12s\n" "$f" "$(bc <<< "scale=1; ${tx[$f]}/$un")" "$(bc <<< "scale=1; ${rx[$f]}/$un")" "$(bc <<< "scale=1;${trate[$f]}/$un")" "$(bc <<< "scale=1;${rrate[$f]}/$un")"
+                printf "%-12s %12s %12s %12s %12s\n" "$f" "$(bc <<< "scale=3; ${tx[$f]}/$un")" "$(bc <<< "scale=3; ${rx[$f]}/$un")" "$(bc <<< "scale=3;${trate[$f]}/$un")" "$(bc <<< "scale=3;${rrate[$f]}/$un")"
             fi
             n=$((n + 1))
         fi
